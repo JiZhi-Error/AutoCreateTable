@@ -2,8 +2,10 @@ package github.jizhi.autocreatetable.util
 
 import com.alibaba.fastjson2.JSONArray
 import com.alibaba.fastjson2.JSONObject
+import com.alibaba.fastjson2.toJSONString
 import java.io.BufferedReader
 import java.io.FileReader
+import java.util.LinkedList
 
 /**
  * @author  JiZhi
@@ -22,36 +24,29 @@ class ParseJSON {
 
 
     // TODO 需要分节步骤，目前会导致外层和里层列类型拼串格式一致，其实应该两种格式拼串
-    private fun parse(data: Any): Any {
-
-        var columnData = ""
-        if (data is JSONObject) {
-            data.forEach { k, v ->
-                when (v) {
-                    is JSONObject -> {
-                        columnData += "$k  struct<${parse(v)}>, "
-                    }
-                    is JSONArray -> {
-                        columnData += "$k  array<${parse(v)}>, "
-                    }
-                    is String -> {
-                        columnData += "$k  :string, "
-                    }
-                    is Int -> {
-                        columnData += "$k  :int, "
-                    }
-                    is Long -> {
-                        columnData += "$k  :bigint, "
+    private fun parse(data: Any, layer: Int = 0): String {
+        return when (data) {
+            is JSONObject -> {
+                val result = LinkedList<String>()
+                data.forEach { k, v ->
+                    when (v){
+                        is JSONObject -> if (layer<=1) result.add("$k  struct<${parse(v,layer.inc())}>") else result.add("$k  :struct<${parse(v,layer.inc())}>")
+                        is JSONArray -> if (layer<=1) result.add("$k  array<${parse(v,layer.inc())}>") else result.add("$k  :array<${parse(v,layer.inc())}>")
+                        else -> result.add("$k  ${parse(v,layer.inc())}")
                     }
                 }
+                result.joinToString(" ,")
             }
-        } else if (data is JSONArray) {
-            if (data.isNotEmpty()) {
-                columnData += "struct<${parse(data[0]!!)}>  "
-            }
-        }
 
-        return columnData.subSequence(0, columnData.lastIndex -1 )
+            is JSONArray -> {
+                "struct<${parse(data[0],layer.inc())}>"
+            }
+
+            is String -> if (layer<=1) "string" else ":string"
+            is Int -> if (layer<=1) "int" else ":int"
+            is Long -> if (layer<=1) "bigint" else ":bigint"
+            else -> "null"
+        }
     }
 
 }
